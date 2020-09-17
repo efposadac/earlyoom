@@ -12,6 +12,8 @@ typedef struct {
     double mem_kill_percent;
     double swap_term_percent;
     double swap_kill_percent;
+    /* Max memory allowed per process*/
+    double max_memory_per_process_percent;
     /* ignore /proc/PID/oom_score_adj? */
     bool ignore_oom_score_adj;
     /* send d-bus notifications? */
@@ -26,5 +28,6 @@ typedef struct {
 } poll_loop_args_t;
 
 void kill_largest_process(const poll_loop_args_t* args, int sig);
+void kill_biggest_process(const poll_loop_args_t* args, int sig, long long MemTotalKiB);
 
 #endif

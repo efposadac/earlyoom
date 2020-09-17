@@ -37,6 +37,7 @@ enum {
     LONG_OPT_PREFER = 513,
     LONG_OPT_AVOID,
     LONG_OPT_DRYRUN,
+    LONG_OPT_MMPP,
 };
 
 static int set_oom_score_adj(int);
@@ -69,6 +70,7 @@ int main(int argc, char* argv[])
         .mem_kill_percent = 5,
         .swap_kill_percent = 5,
         .report_interval_ms = 1000,
+        .max_memory_per_process_percent = 100,
         /* omitted fields are set to zero */
     };
     int set_my_priority = 0;
@@ -95,6 +97,7 @@ int main(int argc, char* argv[])
     int c;
     const char* short_opt = "m:s:M:S:kinN:dvr:ph";
     struct option long_opt[] = {
+        { "mmpp", required_argument, NULL, LONG_OPT_MMPP },
         { "prefer", required_argument, NULL, LONG_OPT_PREFER },
         { "avoid", required_argument, NULL, LONG_OPT_AVOID },
         { "dryrun", no_argument, NULL, LONG_OPT_DRYRUN },
@@ -185,6 +188,13 @@ int main(int argc, char* argv[])
         case 'p':
             set_my_priority = 1;
             break;
+        case LONG_OPT_MMPP:
+            tuple = parse_term_kill_tuple(optarg, 100);
+            if (strlen(tuple.err)) {
+                fatal(16, "--mmpp: %s", tuple.err);
+            }
+            args.max_memory_per_process_percent = tuple.term;
+            break;
         case LONG_OPT_PREFER:
             prefer_cmds = optarg;
             break;
@@ -218,6 +228,8 @@ int main(int argc, char* argv[])
                 "                            to 0 to disable completely\n"
                 "  -p                        set niceness of earlyoom to -20 and oom_score_adj to\n"
                 "                            -100\n"
+                "  --mmpp PERCENT            set the maximum amount of available memory a process \n"
+                "                            is allowed to use before sending SIGTERM signal. (default 100)\n"
                 "  --prefer REGEX            prefer to kill processes matching REGEX\n"
                 "  --avoid REGEX             avoid killing processes matching REGEX\n"
                 "  --dryrun                  dry run (do not kill any processes)\n"
@@ -298,6 +310,8 @@ int main(int argc, char* argv[])
         args.mem_term_percent, args.swap_term_percent);
     fprintf(stderr, "        SIGKILL when mem <= " PRIPCT " and swap <= " PRIPCT "\n",
         args.mem_kill_percent, args.swap_kill_percent);
+    fprintf(stderr, "        SIGTERM to any process using >= " PRIPCT " of available mem\n",
+        args.max_memory_per_process_percent);
 
     /* Dry-run oom kill to make sure stack grows to maximum size before
      * calling mlockall()
@@ -396,6 +410,9 @@ static void poll_loop(const poll_loop_args_t* args)
             warn("low memory! at or below SIGTERM limits: mem " PRIPCT ", swap " PRIPCT "\n",
                 args->mem_term_percent, args->swap_term_percent);
             sig = SIGTERM;
+        } else if (m.MemAvailablePercent <= 100 - args->max_memory_per_process_percent) {
+            // Find biggest process
+            kill_biggest_process(args, SIGTERM, m.MemTotalKiB);
         }
         if (sig) {
             kill_largest_process(args, sig);
