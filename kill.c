@@ -491,10 +491,10 @@ void kill_biggest_process(const poll_loop_args_t* args, int sig, long long MemTo
     }
 
     if (victim.pid <= 0) {
-        warn("Could not find a process to kill. Sleeping 1 second.\n");
-        if (args->notify) {
-            notify("earlyoom", "Error: Could not find a process to kill. Sleeping 1 second.");
-        }
+        // warn("Could not find a process to kill. Sleeping 1 second.\n");
+        // if (args->notify) {
+        //     notify("earlyoom", "Error: Could not find a process to kill. Sleeping 1 second.");
+        // }
         sleep(1);
         return;
     }
